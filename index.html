@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Reading Comprehension Practice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        secondary: '#475569',
+                        success: '#22c55e',
+                        danger: '#ef4444',
+                        background: '#f8fafc',
+                        card: '#ffffff'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        
+        .passage-content {
+            line-height: 1.8;
+            font-size: 1.05rem;
+        }
+
+        .passage-content p {
+            margin-bottom: 1rem;
+        }
+        
+        /* Custom scrollbar for passage area */
+        .passage-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .passage-area::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+            border-radius: 4px;
+        }
+        .passage-area::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .passage-area::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        .option-btn {
+            transition: all 0.2s ease-in-out;
+            border: 2px solid #e2e8f0;
+        }
+
+        .option-btn:hover:not(:disabled) {
+            border-color: #93c5fd;
+            background-color: #eff6ff;
+        }
+
+        .option-btn.selected {
+            border-color: #2563eb;
+            background-color: #eff6ff;
+        }
+
+        .option-btn.correct {
+            border-color: #22c55e;
+            background-color: #f0fdf4;
+            color: #15803d;
+        }
+
+        .option-btn.incorrect {
+            border-color: #ef4444;
+            background-color: #fef2f2;
+            color: #b91c1c;
+        }
+        
+        .flagged-indicator {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            width: 12px;
+            height: 12px;
+            background-color: #f59e0b;
+            border-radius: 50%;
+            display: none;
+        }
+        
+        .is-flagged .flagged-indicator {
+            display: block;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            background-color: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col">
+
+    <!-- App Header -->
+    <header class="bg-white border-b border-gray-200 shadow-sm px-6 py-4 flex justify-between items-center shrink-0 z-10 relative">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+            </div>
+            <h1 class="text-xl font-bold text-gray-800 tracking-tight">Reading Practice Module</h1>
+        </div>
+        
+        <!-- Timer (Hidden initially) -->
+        <div id="timer-container" class="hidden items-center gap-2 bg-slate-100 px-4 py-2 rounded-full border border-slate-200 shadow-inner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span id="timer-display" class="font-mono font-medium text-slate-700">00:00</span>
+        </div>
+        
+        <button id="btn-quit" class="hidden text-sm text-slate-500 hover:text-slate-800 font-medium px-3 py-1 rounded transition-colors">Quit Session</button>
+    </header>
+
+    <!-- Launch Screen (Selection) -->
+    <main id="screen-launch" class="flex-1 overflow-y-auto bg-slate-50 p-6 flex flex-col items-center">
+        <div class="max-w-4xl w-full mt-8">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-800 mb-3">Select a Practice Assessment</h2>
+                <p class="text-slate-600 max-w-2xl mx-auto">Choose a passage below to begin. Your time will be recorded. You can flag questions to return to them later before submitting your final answers.</p>
+            </div>
+
+            <!-- Categories -->
+            <div class="mb-8">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4 border-b pb-2">Informational & Science</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="list-informational">
+                    <!-- Cards injected by JS -->
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4 border-b pb-2">Narrative & Fiction</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="list-narrative">
+                    <!-- Cards injected by JS -->
+                </div>
+            </div>
+            
+             <div class="mb-12">
+                <h3 class="text-lg font-semibold text-slate-700 mb-4 border-b pb-2">History & Profile</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="list-history">
+                    <!-- Cards injected by JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Assessment Screen (Split View) -->
+    <main id="screen-assessment" class="hidden flex-1 overflow-hidden flex flex-col md:flex-row bg-slate-200">
+        
+        <!-- Left Side: Passage -->
+        <section class="w-full md:w-1/2 h-1/2 md:h-full bg-white border-r border-slate-300 flex flex-col shadow-[4px_0_15px_-3px_rgba(0,0,0,0.05)] z-0 relative">
+            <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/80 backdrop-blur-sm sticky top-0 shrink-0">
+                <span id="passage-category" class="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-100 px-2 py-1 rounded-md">Category</span>
+                <h2 id="passage-title" class="text-2xl font-bold text-slate-800 mt-2">Passage Title</h2>
+            </div>
+            <div id="passage-content" class="passage-area flex-1 overflow-y-auto p-6 md:p-8 text-slate-700 passage-content">
+                <!-- Content injected by JS -->
+            </div>
+        </section>
+
+        <!-- Right Side: Questions & Navigation -->
+        <section class="w-full md:w-1/2 h-1/2 md:h-full bg-slate-50 flex flex-col relative z-0">
+            
+            <!-- Question Progress/Nav Bar -->
+            <div class="px-6 py-4 border-b border-slate-200 bg-white flex justify-between items-center shrink-0">
+                <div class="font-medium text-slate-500">
+                    Question <span id="current-q-num" class="text-slate-800 font-bold text-lg">1</span> of <span id="total-q-num">x</span>
+                </div>
+                
+                <div class="flex gap-2">
+                     <button id="btn-flag" class="flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
+                        Flag for Review
+                    </button>
+                </div>
+            </div>
+
+            <!-- Question Area -->
+            <div id="question-area" class="flex-1 overflow-y-auto p-6 md:p-8 flex flex-col">
+                <div class="max-w-2xl mx-auto w-full flex-1">
+                    <h3 id="question-text" class="text-xl font-semibold text-slate-800 mb-6 leading-snug">
+                        <!-- Question injected by JS -->
+                    </h3>
+                    
+                    <div id="options-container" class="flex flex-col gap-3">
+                        <!-- Options injected by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Navigation -->
+            <div class="p-4 bg-white border-t border-slate-200 shrink-0 flex justify-between items-center">
+                <button id="btn-prev" class="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 font-medium hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    Previous
+                </button>
+                
+                <!-- Question map for quick navigation -->
+                <div id="question-map" class="hidden md:flex gap-1.5">
+                    <!-- Nav dots injected by JS -->
+                </div>
+
+                <button id="btn-next" class="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-sm">
+                    Next
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </button>
+                
+                <button id="btn-submit" class="hidden px-6 py-2.5 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 flex items-center gap-2 transition-colors shadow-sm">
+                    Submit Test
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- Results Screen -->
+    <main id="screen-results" class="hidden flex-1 overflow-y-auto bg-slate-50 p-6 flex flex-col items-center">
+        <div class="max-w-3xl w-full mt-8 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="text-center mb-8 pb-8 border-b border-slate-100">
+                <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Practice Complete!</h2>
+                <p class="text-slate-500">You completed <span id="res-passage-title" class="font-medium text-slate-700"></span></p>
+                
+                <div class="flex justify-center gap-8 mt-6">
+                    <div class="text-center">
+                        <div class="text-sm text-slate-500 font-medium uppercase tracking-wide">Score</div>
+                        <div class="text-3xl font-bold text-blue-600"><span id="res-score">0</span>/<span id="res-total">0</span></div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-sm text-slate-500 font-medium uppercase tracking-wide">Percentage</div>
+                        <div class="text-3xl font-bold text-slate-800"><span id="res-percent">0</span>%</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-sm text-slate-500 font-medium uppercase tracking-wide">Time</div>
+                        <div class="text-3xl font-bold text-slate-800" id="res-time">00:00</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW: Passage reference for review -->
+            <div class="mb-8 border border-blue-200 rounded-xl overflow-hidden">
+                <button id="btn-toggle-passage" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-6 py-4 flex justify-between items-center transition-colors">
+                    <span class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                        Review Reading Passage
+                    </span>
+                    <svg id="icon-toggle-passage" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="transform transition-transform duration-200"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div id="review-passage-content" class="hidden p-6 bg-white text-slate-700 passage-content max-h-96 overflow-y-auto border-t border-blue-100">
+                    <!-- Passage injected by JS -->
+                </div>
+            </div>
+
+            <div id="review-container" class="space-y-6 mb-8">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">Question Review</h3>
+                <!-- Review items injected by JS -->
+            </div>
+
+            <div class="text-center pt-6 border-t border-slate-100">
+                <button id="btn-return-home" class="px-6 py-3 rounded-lg bg-slate-800 text-white font-medium hover:bg-slate-900 transition-colors shadow-sm">
+                    Return to Passage Selection
+                </button>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Custom Confirm Modal (replaces window.confirm) -->
+    <div id="modal-confirm" class="hidden fixed inset-0 z-50 flex items-center justify-center modal-overlay">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 m-4 transform transition-all">
+            <h3 id="modal-title" class="text-lg font-bold text-slate-900 mb-2">Confirm Action</h3>
+            <p id="modal-msg" class="text-slate-600 mb-6">Are you sure you want to proceed?</p>
+            <div class="flex justify-end gap-3">
+                <button id="modal-btn-cancel" class="px-4 py-2 rounded-lg font-medium text-slate-600 hover:bg-slate-100 transition-colors">Cancel</button>
+                <button id="modal-btn-confirm" class="px-4 py-2 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Data Definitions ---
+        const passagesData = [
+            // Informational / Science
+            {
+                id: 'p1',
+                title: 'How Honey Bees Produce Honey',
+                category: 'Informational & Science',
+                group: 'informational',
+                content: `
+                    <p>Making honey isn't magic, even if it looks like it. It’s mostly just biology and a massive amount of teamwork. Worker bees have to figure out how to take runny flower nectar and turn it into a thick food that won't go bad over the winter.</p>
+                    <p>It starts with the foraging bees. They use their long, tube-like tongues to slurp up nectar from flowers. Instead of digesting it, they store it in a special "honey stomach." Here, natural enzymes start breaking down the complex sugars. When the bee gets back to the hive, it passes the nectar off to the household bees, who add even more enzymes to the mix.</p>
+                    <p>But nectar is too watery to store long-term—it would just spoil. So, the bees drop the liquid into open honeycomb cells and get to work fanning their wings. Imagine thousands of tiny wings acting like fans, moving the air fast enough to dry out the nectar. Once enough water evaporates, you're left with thick, sticky honey.</p>
+                    <p>When it's finally the right consistency, the bees cap off the cell with fresh beeswax. This airtight seal locks out moisture and bacteria. As long as that cap stays intact, the honey inside can last forever.</p>
+                `,
+                questions: [
+                    {
+                        text: "Where is the safest place for foraging bees to transport nectar back to the hive?",
+                        options: [
+                            "Inside a dedicated organ called the honey stomach.",
+                            "In the little pollen baskets on their hind legs.",
+                            "Somewhere near the main entrance of the hive.",
+                            "They balance the liquid carefully on their wings."
+                        ],
+                        correctIndex: 0
+                    },
+                    {
+                        text: "What causes the chemical reaction that breaks down the nectar sugars?",
+                        options: [
+                            "The heat coming from the sun hitting the hive.",
+                            "Freshwater they collect from nearby streams.",
+                            "Natural enzymes made inside the bees' bodies.",
+                            "The wax they scrape off older honeycombs."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "What happens if the bees don't evaporate the extra water out of the nectar?",
+                        options: [
+                            "The wax honeycomb cells will melt from the weight.",
+                            "It will probably spoil and never turn into real honey.",
+                            "The bees won't be able to fan their wings anymore.",
+                            "The hive will get way too cold."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "How do the bees actually get the water out of the honey?",
+                        options: [
+                            "They drop dry pollen into the cells to soak it up.",
+                            "They seal the cells up quickly before it gets cold.",
+                            "They mix hot water into the comb.",
+                            "They use their wings as fans to blow the moisture away."
+                        ],
+                        correctIndex: 3
+                    },
+                    {
+                        text: "How do you know when a honey cell is completely finished?",
+                        options: [
+                            "The honey turns a really dark brown colour.",
+                            "You can see air bubbles popping on the surface.",
+                            "There is a fresh beeswax cap covering the top.",
+                            "The bees stop flying into that part of the hive."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "Why do bees go to all this trouble to make honey?",
+                        options: [
+                            "So they have plenty of food to survive the cold winter.",
+                            "To help more flowers grow around their home.",
+                            "To trap other bugs that try to sneak into the hive.",
+                            "To make the walls of their hive stronger."
+                        ],
+                        correctIndex: 0
+                    }
+                ]
+            },
+            {
+                id: 'p4',
+                title: 'The Extraordinary Platypus',
+                category: 'Informational & Science',
+                group: 'informational',
+                content: `
+                    <p>The platypus is so strange that when European scientists first saw a stuffed one in the 1790s, they thought it was a joke. They literally looked for stitches, assuming someone had sewn a duck's bill onto a beaver's body.</p>
+                    <p>It turns out the platypus is real, but it belongs to a bizarre group of mammals called monotremes. Unlike almost every other mammal on Earth, they lay eggs. Even weirder, when the babies hatch, the mother feeds them milk, but she doesn't have nipples. Instead, the milk just kind of oozes out of glands on her belly like sweat, and the babies lap it off her fur.</p>
+                    <p>Their hunting style is just as weird. When a platypus dives underwater, it clamps its eyes, ears, and nose completely shut. So how does it find food? Its rubbery bill is packed with thousands of tiny sensors. These sensors pick up the faint electrical signals made by shrimp and crayfish moving in the mud. It's a hunting trick called electrolocation.</p>
+                    <p>And if all that wasn't enough, the males are venomous. They have sharp spurs on their back legs connected to venom glands. They don't use it to hunt, though. The venom is mostly saved for fighting off other males during mating season, making the platypus one of the only venomous mammals on the planet.</p>
+                `,
+                questions: [
+                    {
+                        text: "Why did European scientists think the first platypus they saw was fake?",
+                        options: [
+                            "It had shiny metallic feathers they had never seen before.",
+                            "It smelled like strange chemicals they couldn't identify.",
+                            "It looked like someone glued a duck and a beaver together.",
+                            "It came from an island that wasn't on any of their maps."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "What makes an animal a 'monotreme'?",
+                        options: [
+                            "It's a reptile that can live underwater forever without breathing.",
+                            "It's a mammal, but it lays eggs instead of having live babies.",
+                            "It's a type of bird that grows fur instead of feathers.",
+                            "It's a frog that never goes through a tadpole stage."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "How do baby platypuses drink milk if the mother doesn't have nipples?",
+                        options: [
+                            "She chews up bugs and spits them into the babies' mouths.",
+                            "She keeps sweet nectar in a pouch for them to drink.",
+                            "They actually just drink it like normal mammals.",
+                            "They lick it right off her belly fur after it oozes out of her skin."
+                        ],
+                        correctIndex: 3
+                    },
+                    {
+                        text: "How do they find food underwater if their eyes and ears are shut?",
+                        options: [
+                            "Their bills can feel the tiny electrical pulses from moving bugs.",
+                            "They blow bubbles out of their nose to use echolocation.",
+                            "They can sense warm water currents left behind by fish.",
+                            "They drag their sharp claws through the mud until they hit something."
+                        ],
+                        correctIndex: 0
+                    },
+                    {
+                        text: "Why do male platypuses have venomous spurs?",
+                        options: [
+                            "To knock out massive fish before eating them.",
+                            "To help dig deep holes into the side of the riverbank.",
+                            "To stop snakes from eating their eggs.",
+                            "To fight off other males when they are trying to find a mate."
+                        ],
+                        correctIndex: 3
+                    }
+                ]
+            },
+            {
+                id: 'p5',
+                title: 'Harnessing the Gale: The Story of Wind Power',
+                category: 'Informational & Science',
+                group: 'informational',
+                content: `
+                    <p>Long before those massive white turbines popped up on hillsides, people were already putting the wind to work. But early windmills weren't used to make electricity—they were built to do the heavy lifting. Back in the 9th century in Persia (modern-day Iran), engineers built the first windmills using sails made of woven reeds. The goal was simple: use the wind to grind grain into flour so humans didn't have to do it by hand.</p>
+                    <p>A few hundred years later, the idea made its way to Europe. In flat, coastal places like the Netherlands, windmills became a matter of survival. The Dutch figured out how to use the spinning blades to pump water out of flooded areas. They essentially drained the land to build towns and farms.</p>
+                    <p>But wind power didn't create electricity until 1887. A Scottish professor named James Blyth built a clunky, cloth-sailed machine in his back garden to power the lights in his holiday bach. Today’s giant wind turbines do exactly the same thing—they turn wind (kinetic energy) into mechanical power. The big difference is the design. Modern fibreglass blades are shaped like aeroplane wings, using air pressure to spin the rotor way faster and more efficiently than Blyth's old cloth sails ever could.</p>
+                `,
+                questions: [
+                    {
+                        text: "What were the very first windmills in Persia actually used for?",
+                        options: [
+                            "Pumping seawater away from towns on the coast.",
+                            "Grinding up grain so people could bake with it.",
+                            "Giving a tiny bit of electricity to local houses.",
+                            "Powering machines that wove sails out of reeds."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "How did the Dutch change windmills to survive in the Netherlands?",
+                        options: [
+                            "They hooked them up to early power grids.",
+                            "They swapped the wooden blades out for lighter fibreglass.",
+                            "They built them extra tall to catch storms.",
+                            "They used them as massive water pumps to drain the land."
+                        ],
+                        correctIndex: 3
+                    },
+                    {
+                        text: "Why do we still talk about Professor James Blyth today?",
+                        options: [
+                            "Because he designed the aeroplane wing shape we still use.",
+                            "Because he brought the blueprints from Persia to Europe.",
+                            "Because he was the first guy to make electricity with wind.",
+                            "Because he forced Scotland to switch to green energy."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "What is the main difference between modern turbine blades and old windmill sails?",
+                        options: [
+                            "The new ones are curved to use air pressure differences.",
+                            "The new ones still use heavy cloth, just more of it.",
+                            "The new ones are built way lower to the ground.",
+                            "The new ones spin backwards."
+                        ],
+                        correctIndex: 0
+                    },
+                    {
+                        text: "What does the term kinetic energy mean in this story?",
+                        options: [
+                            "Electricity that gets stored inside large batteries.",
+                            "The heat you get when two stones rub together.",
+                            "The force of water pushing against a pump.",
+                            "The energy that comes from things physically moving."
+                        ],
+                        correctIndex: 3
+                    }
+                ]
+            },
+            // Narrative & Fiction
+            {
+                id: 'p2',
+                title: 'The Harakeke Harvest - The Secret of the Gel',
+                category: 'Narrative & Fiction',
+                group: 'narrative',
+                content: `
+                    <p>Kuia Hine watched the villagers preparing the dried harakeke for weaving and decided they had enough. It was time to head down to the wetlands. Down in the low-lying valley, massive clumps of harakeke grew thick and green. As her group walked, they could see other workers out on the flats, already stripping leaves.</p>
+                    <p>Tane, her lead assistant, breathed in deeply. "You can smell the crushed leaves from here."</p>
+                    <p>Kuia Hine nodded. "We need to get moving if we want to gather enough before the sun goes down." She looked back at the four young learners trailing behind: Wiremu, Rewi, Marama, and Pania. Pania was quiet, as usual, walking beside a scruffy wild dog. Kuia Hine knew the best place to test them was out here in the field, not sitting around the village.</p>
+                    <p>"Alright," she called out. "We've got the outer leaves for weaving. What's the hidden treasure sitting at the base of the harakeke?"</p>
+                    <p>Wiremu's hand snapped up. "The clear gel at the bottom of the stem!"</p>
+                    <p>"And what do we use it for?"</p>
+                    <p>Rewi stepped forward this time. "It soothes burns and cuts on your skin. Kind of like aloe vera."</p>
+                    <p>Kuia Hine smiled. "And how do we harvest it so the plant doesn't die?"</p>
+                    <p>Marama answered immediately. "We only take from the outer leaves. You have to leave the young shoots in the middle alone."</p>
+                    <p>The teacher turned to the quiet girl at the back. "You know how to use the gel safely, don't you, Pania?"</p>
+                    <p>Pania didn't answer. Instead, the scruffy dog stepped in front of her and let out a low growl at the group.</p>
+                    <p>"No need for that," Kuia Hine said softly. She didn't step back. She just gave the dog a firm, calm look to prove she wasn't a threat.</p>
+                    <p>The dog stopped growling and sat down next to Pania.</p>
+                    <p>Kuia Hine looked back at the girl with a warm expression. "You know the traditional remedies, don't you, child?"</p>
+                `,
+                questions: [
+                    {
+                        text: "What natural medicine do you find at the bottom of a harakeke leaf?",
+                        options: [
+                            "A tough fibre that is only used for making baskets.",
+                            "A cooling gel that helps heal burns and cuts.",
+                            "An oil they burn in lamps to send signals.",
+                            "A bitter liquid you drink for a sore stomach."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "Why did Kuia Hine decide to leave for the wetlands?",
+                        options: [
+                            "Because the young shoots on the plants were turning brown.",
+                            "Because her students finally finished making their tools.",
+                            "Because the village had already collected enough dried fibre.",
+                            "Because the wild dog dragged them down there."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "Why did the dog growl at the group?",
+                        options: [
+                            "The sound of people stripping leaves scared it.",
+                            "It saw a bird down in the valley it wanted to chase.",
+                            "It was tired of walking all day.",
+                            "It was protecting Pania and didn't trust them."
+                        ],
+                        correctIndex: 3
+                    },
+                    {
+                        text: "How do you make sure the harakeke plant keeps growing after a harvest?",
+                        options: [
+                            "You cut the whole plant down to the dirt.",
+                            "You chop the middle shoots so the gel grows back faster.",
+                            "You only take the outside leaves and leave the middle alone.",
+                            "You dig it up and move it to a drier place."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "What was Kuia Hine trying to prove when she stared down the dog?",
+                        options: [
+                            "That she was calm, in control, and not afraid.",
+                            "She was teaching the kids how to train a wild animal.",
+                            "She was trying to scare the dog away so they could work.",
+                            "She was letting Pania know she was in trouble."
+                        ],
+                        correctIndex: 0
+                    },
+                    {
+                        text: "Why didn't Pania answer Kuia Hine right away?",
+                        options: [
+                            "She was watching the other workers out on the flats.",
+                            "She was mad that nobody was paying attention to her dog.",
+                            "She was too tired from the long walk to speak.",
+                            "She was probably just shy about talking in front of everyone."
+                        ],
+                        correctIndex: 3
+                    }
+                ]
+            },
+            {
+                id: 'p6',
+                title: 'The Knight’s Advantage',
+                category: 'Narrative & Fiction',
+                group: 'narrative',
+                content: `
+                    <p>The library was loud, filled with the usual chaos of the lunchtime chess club. Over in the corner reserved for the advanced players, Leo's hand was hovering over his bishop. His foot bounced against the table leg in a frantic, non-stop rhythm.</p>
+                    <p>"You're rushing," Samira said. She didn't even look up from the board. She just rested her chin in her hands, her eyes locked on the black and white squares.</p>
+                    <p>"I'm not rushing, I'm playing aggressively," Leo shot back. He finally slid his bishop across the board. "Check."</p>
+                    <p>Samira barely blinked. She just sighed. "This is exactly what you did last week. You throw your pieces forward because you want to win in the first five minutes." Without hesitation, she picked up her knight, moved it in an L-shape, and plunked it down right in the middle of the board. She didn't bother saying 'check.' She didn't need to. Leo’s bishop was dead, and his king was wide open.</p>
+                    <p>Leo groaned and flopped back in his chair, running a hand over his face. "I didn't even see that knight."</p>
+                    <p>"Because you only look at what <em>you</em> are attacking," Samira said, softening her voice a bit. "You have to look at the whole board. It’s not just about what you want to do. It’s about what I’m setting up while you aren't paying attention."</p>
+                    <p>"Alright, alright, lecture over," Leo muttered. But he was already leaning back over the board, studying the trap she had caught him in. "Set them up. I want a rematch, and this time I'm actually going to think before I touch anything."</p>
+                `,
+                questions: [
+                    {
+                        text: "How can you tell Leo is feeling anxious while he plays?",
+                        options: [
+                            "He lets out a loud groan before he even moves.",
+                            "His foot is constantly tapping against the table.",
+                            "He sits perfectly still with his chin in his hands.",
+                            "He keeps looking around at the noisy library."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "What does Samira think Leo's biggest problem is?",
+                        options: [
+                            "He takes way too long to decide what to do.",
+                            "He forgets how the knight is supposed to move.",
+                            "He only thinks about his own attacks and ignores her moves.",
+                            "He plays too defensively at the start of the game."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "Why doesn't Samira say 'check' out loud?",
+                        options: [
+                            "She forgot you are supposed to say it in the advanced club.",
+                            "Her move didn't actually put him in check.",
+                            "She wants to trick him into making a mistake.",
+                            "The trap is so obvious that she doesn't even need to point it out."
+                        ],
+                        correctIndex: 3
+                    },
+                    {
+                        text: "How does Leo handle losing his early advantage?",
+                        options: [
+                            "He gets furious and leaves the library.",
+                            "He's annoyed, but he instantly wants to try again and play smarter.",
+                            "He argues with her and refuses to start over.",
+                            "He blames Samira for talking too much."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "What is the real point Samira is trying to make?",
+                        options: [
+                            "You have to be nice and share the board.",
+                            "You should always let the other person go first.",
+                            "Anticipating your opponent is just as important as your own attack.",
+                            "Winning isn't the point of playing chess."
+                        ],
+                        correctIndex: 2
+                    }
+                ]
+            },
+            {
+                id: 'p8',
+                title: 'The Library at the End of the Hall',
+                category: 'Narrative & Fiction',
+                group: 'narrative',
+                content: `
+                    <p>The heavy kauri doors swung shut with a thick thud, instantly cutting off the noise from the school corridors. The air in the archives felt completely different. It smelled ancient—a dry, dusty mix of crumbling paper, old leather, and the faint scent of ash from a stone fireplace that clearly hadn't been used in decades.</p>
+                    <p>Elias crept down the narrow aisle. The thick crimson carpet swallowed the sound of his footsteps. The only light in the room came from little brass lamps bolted to the wooden shelves, which threw long, creepy shadows across the books. The whole room felt like it was holding its breath.</p>
+                    <p>He dragged his fingers along the spines of the heavy books until he found the right one. It was oddly small, bound in cracked black cloth, and didn't have a title. When Elias pulled it off the shelf, a folded piece of brittle parchment slipped from the pages and fluttered to the floor like a dead leaf. He knelt down to pick it up. He recognized the faded, messy handwriting immediately. It wasn't a story. It was a warning.</p>
+                `,
+                questions: [
+                    {
+                        text: "What sense does the writer focus on most in the first paragraph?",
+                        options: [
+                            "Sight",
+                            "Taste",
+                            "Smell",
+                            "Hearing"
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "What does the carpet do to the room?",
+                        options: [
+                            "It makes the room look warmer and friendlier.",
+                            "It makes the room dead quiet by muffling Elias's feet.",
+                            "It makes the room brighter by reflecting the lamps.",
+                            "It makes the aisle too dangerous to walk down."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "How does the book Elias finds seem slightly mysterious?",
+                        options: [
+                            "It glows under the lights.",
+                            "It was hidden behind a locked glass door.",
+                            "It was wrapped in bright red leather.",
+                            "It doesn't have a title on the cover."
+                        ],
+                        correctIndex: 3
+                    },
+                    {
+                        text: "What is the phrase \"fluttered to the floor like a dead leaf\" an example of?",
+                        options: [
+                            "A metaphor",
+                            "A simile",
+                            "Personification",
+                            "Hyperbole"
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "Based on the ending, how is Elias probably feeling right now?",
+                        options: [
+                            "Super excited.",
+                            "Totally bored.",
+                            "Anxious but intrigued.",
+                            "Really annoyed."
+                        ],
+                        correctIndex: 2
+                    }
+                ]
+            },
+            // History & Profile
+            {
+                id: 'p3',
+                title: 'Dame Sophie Pascoe - Paralympic Legend',
+                category: 'History & Profile',
+                group: 'history',
+                content: `
+                    <p>When 15-year-old Sophie Pascoe showed up at the 2008 Beijing Paralympics, she was the youngest person on the New Zealand team. But she didn't let that intimidate her. Swimming in the famous Water Cube, she walked away with three golds, a silver, and a brand new world record.</p>
+                    <p>People paying attention knew she was something special long before Beijing. Sophie lost part of her leg in a lawnmower accident when she was a toddler. By age seven, she was in the pool. Her coach at the QEII Swim Club, Roly Crichton, noticed right away that she was fiercely competitive and naturally fast.</p>
+                    <p>Fast forward to the London 2012 Games. With 17,000 fans watching, Sophie crushed it again. She brought home three more golds and three silvers, smashing world records in the 200m Individual Medley and the 100m Butterfly.</p>
+                    <p>After dominating in Rio and Tokyo, she officially became New Zealand's most successful Paralympian ever. Her final medal count? Nineteen Paralympic medals, including 11 golds. In 2022, she was made a Dame to recognise everything she's done for the sport.</p>
+                    <p>What drove her to train that hard? A lot of it came down to a promise she made to her late grandfather when she was just a kid: that she would win a gold medal for him. Today, she’s a global ambassador for Para sport, proving to young athletes that setbacks don't have to define your future.</p>
+                `,
+                questions: [
+                    {
+                        text: "Why was Sophie's trip to the 2008 Beijing Paralympics such a big deal?",
+                        options: [
+                            "She managed to compete in both swimming and running events.",
+                            "She won four medals while being the youngest person on the team.",
+                            "She broke a world record in literally every race she swam.",
+                            "They made her the head coach right after she finished racing."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "What happened in 2022 to celebrate her incredible career?",
+                        options: [
+                            "She officially became the coach of the Paralympic team.",
+                            "They renamed the swimming pool in Beijing after her.",
+                            "She was made a Dame Companion of the New Zealand Order of Merit.",
+                            "She finally won her 30th gold medal."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "How well did Sophie do at the London 2012 Games?",
+                        options: [
+                            "She won a gold medal in every single event she entered.",
+                            "She got her first silver medal after trying out a new stroke.",
+                            "She carried the flag even though she was hurt.",
+                            "She won six medals in total and broke two world records."
+                        ],
+                        correctIndex: 3
+                    },
+                    {
+                        text: "What made Sophie want to win a medal so badly when she was younger?",
+                        options: [
+                            "She promised her dying grandfather that she would do it.",
+                            "Her friends at the swim club challenged her to try.",
+                            "She really wanted to be the youngest flag bearer ever.",
+                            "She had to do it for a high school project."
+                        ],
+                        correctIndex: 0
+                    },
+                    {
+                        text: "What does it mean when they say she is the \"most decorated Paralympian\"?",
+                        options: [
+                            "She has won the most awards for leadership in sports.",
+                            "She got to design the uniforms for the national team.",
+                            "She has won more medals than any other athlete from New Zealand.",
+                            "She played the most sports out of anyone at the Games."
+                        ],
+                        correctIndex: 2
+                    }
+                ]
+            },
+            {
+                id: 'p7',
+                title: 'Rethinking the Neanderthal',
+                category: 'History & Profile',
+                group: 'history',
+                content: `
+                    <p>If you watch enough movies, you'd think Neanderthals were just grunting cavemen who spent their days hitting things with clubs. But modern archaeology is proving that stereotype completely wrong. It turns out our ancient cousins were a lot smarter than we gave them credit for.</p>
+                    <p>Neanderthals lived across Europe and Asia until about 40,000 years ago, surviving some of the harshest Ice Age conditions imaginable. Brute strength alone won't keep you alive in the freezing cold—you need to be able to solve problems. In recent years, researchers have found complex Neanderthal tools. Some spears were even glued together using birch bark pitch, which requires a really specific, tricky heating process to make. You don't figure that out by being stupid.</p>
+                    <p>But the biggest shock was finding out they had a culture. In caves in Spain, scientists have found ancient wall paintings and jewellery made out of eagle talons, created long before modern humans ever arrived. There are even burial sites that show Neanderthals buried their dead with care, sometimes leaving flowers in the graves. They weren't mindless brutes; they were creative, emotional beings with advanced survival skills.</p>
+                `,
+                questions: [
+                    {
+                        text: "How do movies usually make Neanderthals look?",
+                        options: [
+                            "Like brilliant inventors who taught us how to survive.",
+                            "Like dumb, primitive cavemen who couldn't think.",
+                            "Like peaceful artists who never went hunting.",
+                            "Like people who refused to sleep in caves."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "Why is the birch bark pitch such a big deal?",
+                        options: [
+                            "It shows they knew how to grow trees.",
+                            "It proves they used fire to stay warm.",
+                            "It shows they were smart enough to figure out complex chemistry.",
+                            "It means they used glue to catch animals."
+                        ],
+                        correctIndex: 2
+                    },
+                    {
+                        text: "Why do scientists care about the eagle talon jewellery?",
+                        options: [
+                            "Because it shows they traded with modern humans.",
+                            "Because it implies they worshipped birds.",
+                            "Because it means they only lived in Spain.",
+                            "Because it proves they made art and cared about culture."
+                        ],
+                        correctIndex: 3
+                    },
+                    {
+                        text: "Which part of the text proves that Neanderthals probably felt sadness?",
+                        options: [
+                            "The fact that they survived the Ice Age.",
+                            "The fact that they buried their dead with flowers.",
+                            "The fact that they lived across Europe and Asia.",
+                            "The fact that they were incredibly strong."
+                        ],
+                        correctIndex: 1
+                    },
+                    {
+                        text: "What is the whole point of this passage?",
+                        options: [
+                            "To explain how humans took over the world.",
+                            "To prove that Neanderthals were actually highly intelligent.",
+                            "To teach you how to survive freezing weather.",
+                            "To show you how to make ancient spears."
+                        ],
+                        correctIndex: 1
+                    }
+                ]
+            }
+        ];
+
+        // --- State Variables ---
+        let currentPassage = null;
+        let currentQuestionIndex = 0;
+        
+        // answers[qIndex] = optionIndex
+        let userAnswers = []; 
+        // flagged[qIndex] = true/false
+        let flaggedQuestions = []; 
+        
+        // completed passages to gray them out
+        let completedPassages = []; 
+
+        // Timer variables
+        let timerInterval;
+        let elapsedSeconds = 0;
+
+        // --- DOM Elements ---
+        const screenLaunch = document.getElementById('screen-launch');
+        const screenAssessment = document.getElementById('screen-assessment');
+        const screenResults = document.getElementById('screen-results');
+        
+        const timerContainer = document.getElementById('timer-container');
+        const timerDisplay = document.getElementById('timer-display');
+        const btnQuit = document.getElementById('btn-quit');
+
+        // Modal Elements
+        const modalConfirm = document.getElementById('modal-confirm');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMsg = document.getElementById('modal-msg');
+        const modalBtnCancel = document.getElementById('modal-btn-cancel');
+        const modalBtnConfirm = document.getElementById('modal-btn-confirm');
+        let confirmActionCallback = null;
+
+        // --- STREAMING_CHUNK:Populating Launch Screen... ---
+        function initLaunchScreen() {
+            ['informational', 'narrative', 'history'].forEach(group => {
+                const container = document.getElementById(`list-${group}`);
+                container.innerHTML = ''; // clear
+                
+                const groupPassages = passagesData.filter(p => p.group === group);
+                
+                groupPassages.forEach(passage => {
+                    const isCompleted = completedPassages.includes(passage.id);
+                    
+                    const card = document.createElement('div');
+                    card.className = `p-5 rounded-xl border ${isCompleted ? 'bg-slate-100 border-slate-200 opacity-70' : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-md cursor-pointer transition-all'}`;
+                    
+                    if (!isCompleted) {
+                        card.onclick = () => startAssessment(passage.id);
+                    }
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">${passage.category}</span>
+                            ${isCompleted ? '<span class="text-xs font-bold text-green-600 bg-green-100 px-2 py-0.5 rounded flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Done</span>' : `<span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded">${passage.questions.length} Qs</span>`}
+                        </div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-2 leading-tight">${passage.title}</h4>
+                        <button class="mt-3 w-full py-2 rounded-lg font-medium text-sm transition-colors ${isCompleted ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}" ${isCompleted ? 'disabled' : ''}>
+                            ${isCompleted ? 'Completed' : 'Start Practice'}
+                        </button>
+                    `;
+                    container.appendChild(card);
+                });
+            });
+        }
+
+        // --- STREAMING_CHUNK:Timer Functions... ---
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function startTimer() {
+            elapsedSeconds = 0;
+            timerDisplay.textContent = "00:00";
+            timerContainer.classList.remove('hidden');
+            timerInterval = setInterval(() => {
+                elapsedSeconds++;
+                timerDisplay.textContent = formatTime(elapsedSeconds);
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            timerContainer.classList.add('hidden');
+        }
+
+        // --- STREAMING_CHUNK:Assessment Logic... ---
+        function startAssessment(passageId) {
+            currentPassage = passagesData.find(p => p.id === passageId);
+            currentQuestionIndex = 0;
+            userAnswers = new Array(currentPassage.questions.length).fill(null);
+            flaggedQuestions = new Array(currentPassage.questions.length).fill(false);
+
+            // Populate static passage info
+            document.getElementById('passage-category').textContent = currentPassage.category;
+            document.getElementById('passage-title').textContent = currentPassage.title;
+            document.getElementById('passage-content').innerHTML = currentPassage.content;
+            document.getElementById('total-q-num').textContent = currentPassage.questions.length;
+
+            // Generate Nav Dots
+            const qMap = document.getElementById('question-map');
+            qMap.innerHTML = '';
+            currentPassage.questions.forEach((_, idx) => {
+                const dot = document.createElement('button');
+                dot.className = 'w-8 h-8 rounded flex items-center justify-center text-sm font-medium transition-colors border relative';
+                dot.id = `nav-dot-${idx}`;
+                
+                // Flag indicator
+                const flag = document.createElement('div');
+                flag.className = 'flagged-indicator';
+                dot.appendChild(flag);
+                
+                const num = document.createElement('span');
+                num.textContent = idx + 1;
+                dot.appendChild(num);
+
+                dot.onclick = () => loadQuestion(idx);
+                qMap.appendChild(dot);
+            });
+
+            // Switch screens
+            screenLaunch.classList.add('hidden');
+            screenResults.classList.add('hidden');
+            screenAssessment.classList.remove('hidden');
+            btnQuit.classList.remove('hidden');
+
+            loadQuestion(0);
+            startTimer();
+            
+            // Scroll passage to top
+            document.getElementById('passage-content').scrollTop = 0;
+        }
+
+        // --- STREAMING_CHUNK:Loading Questions... ---
+        function loadQuestion(index) {
+            currentQuestionIndex = index;
+            const qData = currentPassage.questions[index];
+            
+            document.getElementById('current-q-num').textContent = index + 1;
+            document.getElementById('question-text').textContent = qData.text;
+
+            // Reset scroll position for long questions
+            document.getElementById('question-area').scrollTop = 0;
+
+            // Render Options
+            const optsContainer = document.getElementById('options-container');
+            optsContainer.innerHTML = '';
+            
+            qData.options.forEach((optText, optIdx) => {
+                const btn = document.createElement('button');
+                const isSelected = userAnswers[index] === optIdx;
+                
+                btn.className = `option-btn w-full text-left p-4 rounded-xl flex gap-4 items-start ${isSelected ? 'selected' : 'bg-white'}`;
+                
+                // Letter bubble (A, B, C, D)
+                const letter = String.fromCharCode(65 + optIdx);
+                
+                btn.innerHTML = `
+                    <div class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-100 text-slate-500 border border-slate-200'}">
+                        ${letter}
+                    </div>
+                    <div class="flex-1 pt-1 font-medium ${isSelected ? 'text-blue-900' : 'text-slate-700'}">${optText}</div>
+                `;
+
+                btn.onclick = () => selectOption(optIdx);
+                optsContainer.appendChild(btn);
+            });
+
+            updateNavigationState();
+        }
+
+        // --- STREAMING_CHUNK:Handling User Interaction... ---
+        function selectOption(optIndex) {
+            userAnswers[currentQuestionIndex] = optIndex;
+            // Reload UI for current question to reflect selection
+            loadQuestion(currentQuestionIndex);
+        }
+
+        function toggleFlag() {
+            flaggedQuestions[currentQuestionIndex] = !flaggedQuestions[currentQuestionIndex];
+            updateNavigationState();
+        }
+
+        function updateNavigationState() {
+            // Update Prev/Next buttons
+            const btnPrev = document.getElementById('btn-prev');
+            const btnNext = document.getElementById('btn-next');
+            const btnSubmit = document.getElementById('btn-submit');
+            
+            btnPrev.disabled = currentQuestionIndex === 0;
+            
+            if (currentQuestionIndex === currentPassage.questions.length - 1) {
+                btnNext.classList.add('hidden');
+                btnSubmit.classList.remove('hidden');
+            } else {
+                btnNext.classList.remove('hidden');
+                btnSubmit.classList.add('hidden');
+            }
+
+            // Update Flag button UI
+            const btnFlag = document.getElementById('btn-flag');
+            if (flaggedQuestions[currentQuestionIndex]) {
+                btnFlag.classList.add('bg-amber-100', 'border-amber-400');
+                btnFlag.classList.remove('bg-amber-50', 'border-amber-200');
+                btnFlag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg> Unflag`;
+            } else {
+                btnFlag.classList.add('bg-amber-50', 'border-amber-200');
+                btnFlag.classList.remove('bg-amber-100', 'border-amber-400');
+                btnFlag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg> Flag for Review`;
+            }
+
+            // Update Map Dots
+            currentPassage.questions.forEach((_, idx) => {
+                const dot = document.getElementById(`nav-dot-${idx}`);
+                
+                // Active state
+                if (idx === currentQuestionIndex) {
+                    dot.className = 'w-8 h-8 rounded flex items-center justify-center text-sm font-bold border relative ring-2 ring-blue-600 border-blue-600 bg-blue-50 text-blue-800';
+                } else if (userAnswers[idx] !== null) {
+                    // Answered
+                    dot.className = 'w-8 h-8 rounded flex items-center justify-center text-sm font-medium border relative border-slate-300 bg-slate-200 text-slate-700 hover:bg-slate-300';
+                } else {
+                    // Unanswered
+                    dot.className = 'w-8 h-8 rounded flex items-center justify-center text-sm font-medium border relative border-slate-300 bg-white text-slate-500 hover:bg-slate-50';
+                }
+
+                // Flag state
+                if (flaggedQuestions[idx]) {
+                    dot.classList.add('is-flagged');
+                } else {
+                    dot.classList.remove('is-flagged');
+                }
+            });
+        }
+
+        // --- STREAMING_CHUNK:Submission & Results... ---
+        function confirmSubmit() {
+            const unanswered = userAnswers.filter(a => a === null).length;
+            const flagged = flaggedQuestions.filter(f => f === true).length;
+            
+            let msg = "Are you sure you want to submit your test? You will not be able to change your answers.";
+            if (unanswered > 0 || flagged > 0) {
+                msg = `You have <b>${unanswered} unanswered</b> questions and <b>${flagged} flagged</b> questions.<br><br>Are you sure you want to submit?`;
+            }
+            
+            showModal("Submit Test", msg, processResults);
+        }
+
+        function processResults() {
+            stopTimer();
+            const timeTaken = elapsedSeconds;
+            
+            let score = 0;
+            const total = currentPassage.questions.length;
+            
+            const reviewContainer = document.getElementById('review-container');
+            reviewContainer.innerHTML = ''; // clear
+
+            currentPassage.questions.forEach((q, idx) => {
+                const userAnswer = userAnswers[idx];
+                const isCorrect = userAnswer === q.correctIndex;
+                if (isCorrect) score++;
+
+                // Build review item
+                const reviewItem = document.createElement('div');
+                reviewItem.className = `p-5 rounded-xl border ${isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`;
+                
+                let optionsHtml = '';
+                q.options.forEach((optText, optIdx) => {
+                    let optClass = 'text-slate-600';
+                    let icon = '';
+                    
+                    if (optIdx === q.correctIndex) {
+                        optClass = 'font-bold text-green-800 bg-green-100 p-2.5 rounded mt-1.5';
+                        icon = (userAnswer === optIdx) ? '✓ (Your Correct Answer)' : '✓ (Correct Answer)';
+                    } else if (optIdx === userAnswer && !isCorrect) {
+                        optClass = 'font-bold text-red-800 bg-red-100 p-2.5 rounded mt-1.5';
+                        icon = '✗ (Your Incorrect Answer)';
+                    } else {
+                        optClass = 'p-2.5 mt-1.5 border border-transparent';
+                    }
+                    
+                    optionsHtml += `<div class="${optClass}">${String.fromCharCode(65 + optIdx)}) ${optText} <span class="float-right">${icon}</span></div>`;
+                });
+
+                reviewItem.innerHTML = `
+                    <div class="flex gap-3 items-start mb-3">
+                        <div class="w-6 h-6 rounded-full flex shrink-0 items-center justify-center text-xs font-bold text-white ${isCorrect ? 'bg-green-500' : 'bg-red-500'}">
+                            ${idx + 1}
+                        </div>
+                        <div class="font-semibold text-slate-800">${q.text}</div>
+                    </div>
+                    <div class="ml-9 space-y-1 text-sm">
+                        ${optionsHtml}
+                        ${userAnswer === null ? '<div class="text-red-500 font-bold italic mt-2">Not answered</div>' : ''}
+                    </div>
+                `;
+                reviewContainer.appendChild(reviewItem);
+            });
+
+            // Update Results Header
+            document.getElementById('res-passage-title').textContent = currentPassage.title;
+            document.getElementById('res-score').textContent = score;
+            document.getElementById('res-total').textContent = total;
+            document.getElementById('res-percent').textContent = Math.round((score / total) * 100);
+            document.getElementById('res-time').textContent = formatTime(timeTaken);
+
+            // Inject passage text into review accordion
+            document.getElementById('review-passage-content').innerHTML = currentPassage.content;
+            document.getElementById('review-passage-content').classList.add('hidden'); // Reset to hidden
+            document.getElementById('icon-toggle-passage').classList.remove('rotate-180');
+
+            // Mark passage as completed
+            if (!completedPassages.includes(currentPassage.id)) {
+                completedPassages.push(currentPassage.id);
+            }
+
+            // Switch screens
+            screenAssessment.classList.add('hidden');
+            btnQuit.classList.add('hidden');
+            screenResults.classList.remove('hidden');
+        }
+
+        // --- STREAMING_CHUNK:Modal and Event Listeners... ---
+        function showModal(title, msg, onConfirm) {
+            modalTitle.textContent = title;
+            modalMsg.innerHTML = msg; // Allows basic HTML like <b>
+            confirmActionCallback = onConfirm;
+            modalConfirm.classList.remove('hidden');
+        }
+
+        function hideModal() {
+            modalConfirm.classList.add('hidden');
+            confirmActionCallback = null;
+        }
+
+        function confirmQuit() {
+            showModal("Quit Session", "Are you sure you want to quit? Your progress and time will be lost.", () => {
+                stopTimer();
+                screenAssessment.classList.add('hidden');
+                btnQuit.classList.add('hidden');
+                screenLaunch.classList.remove('hidden');
+                initLaunchScreen(); // Re-render to ensure completed state is accurate
+            });
+        }
+        
+        function returnHome() {
+            screenResults.classList.add('hidden');
+            screenLaunch.classList.remove('hidden');
+            initLaunchScreen();
+        }
+
+        // Event Listeners
+        document.getElementById('btn-prev').addEventListener('click', () => {
+            if (currentQuestionIndex > 0) loadQuestion(currentQuestionIndex - 1);
+        });
+
+        document.getElementById('btn-next').addEventListener('click', () => {
+            if (currentQuestionIndex < currentPassage.questions.length - 1) loadQuestion(currentQuestionIndex + 1);
+        });
+        
+        document.getElementById('btn-flag').addEventListener('click', toggleFlag);
+        document.getElementById('btn-submit').addEventListener('click', confirmSubmit);
+        document.getElementById('btn-quit').addEventListener('click', confirmQuit);
+        document.getElementById('btn-return-home').addEventListener('click', returnHome);
+
+        // Accordion listener
+        document.getElementById('btn-toggle-passage').addEventListener('click', () => {
+            const content = document.getElementById('review-passage-content');
+            const icon = document.getElementById('icon-toggle-passage');
+            content.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
+        });
+
+        // Keyboard Navigation Support
+        document.addEventListener('keydown', (e) => {
+            // Only trigger if in the assessment screen and modal is hidden
+            if (!screenAssessment.classList.contains('hidden') && modalConfirm.classList.contains('hidden')) {
+                if (e.key === 'ArrowLeft' && currentQuestionIndex > 0) {
+                    loadQuestion(currentQuestionIndex - 1);
+                } else if (e.key === 'ArrowRight' && currentQuestionIndex < currentPassage.questions.length - 1) {
+                    loadQuestion(currentQuestionIndex + 1);
+                }
+                
+                // A, B, C, D selection
+                const key = e.key.toUpperCase();
+                if (['A', 'B', 'C', 'D'].includes(key)) {
+                    const optIndex = key.charCodeAt(0) - 65;
+                    if (currentPassage && optIndex < currentPassage.questions[currentQuestionIndex].options.length) {
+                        selectOption(optIndex);
+                    }
+                }
+            }
+        });
+
+        // Modal listeners
+        modalBtnCancel.addEventListener('click', hideModal);
+        modalBtnConfirm.addEventListener('click', () => {
+            if (confirmActionCallback) confirmActionCallback();
+            hideModal();
+        });
+
+        // Initialize App
+        initLaunchScreen();
+
+    </script>
+</body>
+</html>
